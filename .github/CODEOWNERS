@@ -1,0 +1,15 @@
+# CODEOWNERS — GitHub Copilot Guardrails
+#
+# These rules require specific team approvals before merging.
+# Copilot agents must NOT modify these files without human confirmation.
+
+# Policy files — any change requires Staff Engineer + Security approval
+AGENTS.md                               @platform-engineering @security-team
+.github/CODEOWNERS                      @platform-engineering @security-team
+.github/workflows/                      @platform-engineering @security-team
+
+# Documentation — requires Platform Engineering review
+docs/                                   @platform-engineering
+
+# Default — all other files require a code owner review
+*                                       @your-org/senior-engineers

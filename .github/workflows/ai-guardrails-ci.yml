@@ -1,0 +1,242 @@
+name: AI Guardrails CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+
+# Prevent concurrent runs on the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ──────────────────────────────────────────────
+  # 1. Secret Scanning — blocks on any detected secret
+  # ──────────────────────────────────────────────
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history needed for gitleaks
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run detect-secrets
+        run: |
+          pip install detect-secrets
+          detect-secrets scan --baseline .secrets.baseline
+          detect-secrets audit .secrets.baseline --report --only-allowlisted
+
+  # ──────────────────────────────────────────────
+  # 2. Dependency Vulnerability Scan
+  # ──────────────────────────────────────────────
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node.js projects
+      - name: npm audit (if Node project)
+        if: hashFiles('package.json') != ''
+        run: |
+          npm ci
+          npm audit --audit-level=high
+
+      # Python projects
+      - name: pip safety check (if Python project)
+        if: hashFiles('requirements.txt') != ''
+        run: |
+          pip install safety
+          safety check -r requirements.txt --full-report
+
+      # Go projects
+      - name: govulncheck (if Go project)
+        if: hashFiles('go.mod') != ''
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  # ──────────────────────────────────────────────
+  # 3. SAST — Static Application Security Testing
+  # ──────────────────────────────────────────────
+  sast:
+    name: Static Security Analysis (Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/owasp-top-ten
+            p/secrets
+            p/sql-injection
+            p/xss
+            p/default
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  # ──────────────────────────────────────────────
+  # 4. Unit Tests + Coverage Enforcement
+  # ──────────────────────────────────────────────
+  test-and-coverage:
+    name: Tests & Coverage Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ----- Node.js / TypeScript -----
+      - name: Setup Node (if applicable)
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Run Node tests with coverage
+        if: hashFiles('package.json') != ''
+        run: |
+          npm ci
+          npm test -- --coverage --coverageReporters=text --coverageReporters=lcov
+          # Enforce thresholds (configure in jest.config.js or vitest.config.ts)
+
+      # ----- Python -----
+      - name: Setup Python (if applicable)
+        if: hashFiles('requirements.txt') != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Python tests with coverage
+        if: hashFiles('requirements.txt') != ''
+        run: |
+          pip install pytest pytest-cov
+          pytest --cov=src --cov-report=xml --cov-fail-under=80
+
+      # ----- Go -----
+      - name: Run Go tests with coverage
+        if: hashFiles('go.mod') != ''
+        run: |
+          go test ./... -coverprofile=coverage.out -covermode=atomic
+          go tool cover -func=coverage.out
+          # Fail if total coverage < 80%
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Total coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "Coverage $COVERAGE% is below the required 80%"
+            exit 1
+          fi
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
+  # ──────────────────────────────────────────────
+  # 5. Linting + Style Enforcement
+  # ──────────────────────────────────────────────
+  lint:
+    name: Linting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint (Node/TS)
+        if: hashFiles('.eslintrc*') != '' || hashFiles('eslint.config.*') != ''
+        run: |
+          npm ci
+          npx eslint . --max-warnings=0
+
+      - name: Lint (Python)
+        if: hashFiles('requirements.txt') != ''
+        run: |
+          pip install ruff
+          ruff check . --select ALL --ignore ANN,D,ERA
+
+      - name: Lint (Go)
+        if: hashFiles('go.mod') != ''
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+
+  # ──────────────────────────────────────────────
+  # 6. PR Policy Checks
+  # ──────────────────────────────────────────────
+  pr-policy:
+    name: PR Policy Compliance
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check PR description is not empty
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+          if [ -z "$PR_BODY" ] || [ ${#PR_BODY} -lt 50 ]; then
+            echo "ERROR: PR description is too short. Fill out the PR template."
+            exit 1
+          fi
+
+      - name: Check AI disclosure section is present
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+          if ! echo "$PR_BODY" | grep -q "AI Assistance Disclosure"; then
+            echo "ERROR: PR template's 'AI Assistance Disclosure' section is missing."
+            echo "Please use the PR template and complete the AI disclosure section."
+            exit 1
+          fi
+
+      - name: Check security checklist is completed
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+          # Detect unchecked security items (lines starting with "- [ ]" in security section)
+          UNCHECKED=$(echo "$PR_BODY" | grep -A 20 "Security Checklist" | grep -c "- \[ \]" || true)
+          if [ "$UNCHECKED" -gt 0 ]; then
+            echo "ERROR: $UNCHECKED item(s) in the Security Checklist are unchecked."
+            exit 1
+          fi
+
+  # ──────────────────────────────────────────────
+  # 7. Protected File Change Detection
+  # ──────────────────────────────────────────────
+  protected-files:
+    name: Protected File Guard
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changes to protected files
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          PROTECTED_CHANGED=0
+          for file in AGENTS.md .github/workflows/ .github/CODEOWNERS; do
+            if echo "$CHANGED" | grep -q "$file"; then
+              echo "WARNING: Protected file changed: $file"
+              PROTECTED_CHANGED=1
+            fi
+          done
+
+          if [ "$PROTECTED_CHANGED" -eq 1 ]; then
+            echo ""
+            echo "ERROR: Changes to protected files detected."
+            echo "These files require a Staff Engineer or Security team member to approve."
+            echo "Please add a justification in your PR description under 'Escalation and Override'."
+            exit 1
+          fi
