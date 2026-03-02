@@ -88,6 +88,19 @@ See the PR template for the exact disclosure format.
 
 ---
 
+## One-Time Local Setup
+
+Run this once after cloning the repo to activate the pre-commit hook:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This enables a local warning if you commit code with an unfilled `<author>` placeholder
+in an AI tag. It won't block your commit — it's a reminder.
+
+---
+
 ## Practical Exercises Before Going Live
 
 Complete these before using Copilot on your first production PR:

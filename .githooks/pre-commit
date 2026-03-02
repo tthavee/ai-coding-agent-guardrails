@@ -1,0 +1,32 @@
+#!/bin/sh
+# pre-commit hook: remind developers to tag AI-generated code
+#
+# To activate: git config core.hooksPath .githooks
+# To share with team: commit this file and add the config command to onboarding
+
+STAGED=$(git diff --cached --name-only -- '*.py' '*.ts' '*.js' '*.go' '*.java')
+
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+# Check if any staged code files contain a copilot tag
+TAGGED=$(git diff --cached -- '*.py' '*.ts' '*.js' '*.go' '*.java' | grep "generated: copilot" || true)
+UNTAGGED_REVIEWER=$(echo "$TAGGED" | grep "reviewed by: <author>" || true)
+
+if [ -n "$UNTAGGED_REVIEWER" ]; then
+  echo ""
+  echo "⚠️  WARNING: AI tag found with placeholder reviewer name."
+  echo "   Replace '<author>' with your name before committing:"
+  echo "   # generated: copilot — reviewed by: yourname"
+  echo ""
+  echo "   Files affected:"
+  git diff --cached -- '*.py' '*.ts' '*.js' '*.go' '*.java' \
+    | grep -n "reviewed by: <author>" | head -10
+  echo ""
+  # Warning only — does not block commit
+  # Change 'exit 0' to 'exit 1' below to make this a hard block
+  exit 0
+fi
+
+exit 0
