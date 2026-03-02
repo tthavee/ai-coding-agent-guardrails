@@ -16,6 +16,7 @@ import bcrypt  # generated: copilot — reviewed by: tthavee
 MAX_EMAIL_LENGTH = 254  # RFC 5321 limit
 MAX_USERNAME_LENGTH = 50
 MIN_PASSWORD_LENGTH = 8
+MIN_PASSWORD_LENGTH_test = 10
 _EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
 
