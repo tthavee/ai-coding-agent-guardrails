@@ -207,6 +207,49 @@ jobs:
             exit 1
           fi
 
+      - name: Check AI-generated code is tagged when substantial AI usage is disclosed
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce AI tagging in diff
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+
+          # Determine AI involvement level from checked boxes in PR template
+          SUBSTANTIAL=0
+          AGENT_MODE=0
+
+          # Check if "Copilot generated substantial function/class bodies" is checked
+          if echo "$PR_BODY" | grep -q "\- \[x\] Copilot generated substantial"; then
+            SUBSTANTIAL=1
+          fi
+          # Check if "Copilot Agent ran multi-step autonomous tasks" is checked
+          if echo "$PR_BODY" | grep -q "\- \[x\] Copilot Agent ran"; then
+            AGENT_MODE=1
+          fi
+
+          if [ "$SUBSTANTIAL" -eq 1 ] || [ "$AGENT_MODE" -eq 1 ]; then
+            echo "Substantial or agent-mode AI usage disclosed. Checking for '# generated: copilot' tags..."
+            DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- '*.py' '*.ts' '*.js' '*.go' '*.java')
+
+            if ! echo "$DIFF" | grep -q "generated: copilot"; then
+              echo ""
+              echo "ERROR: PR discloses substantial AI-generated code but no tagging comments found."
+              echo "Per AGENTS.md section 7, AI-generated blocks must include a trailing comment:"
+              echo "  Python/Go:      # generated: copilot — reviewed by: <your-name>"
+              echo "  JS/TS:          // generated: copilot — reviewed by: <your-name>"
+              echo ""
+              echo "Add the tag to each AI-generated function or class, then push again."
+              exit 1
+            fi
+
+            TAG_COUNT=$(echo "$DIFF" | grep -c "generated: copilot" || true)
+            echo "OK: Found $TAG_COUNT 'generated: copilot' tag(s) in the diff."
+          else
+            echo "No substantial AI usage disclosed — tagging check skipped."
+          fi
+
   # ──────────────────────────────────────────────
   # 7. Protected File Change Detection
   # ──────────────────────────────────────────────
