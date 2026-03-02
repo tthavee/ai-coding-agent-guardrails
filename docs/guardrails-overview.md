@@ -37,8 +37,8 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 
 | File | Applies | Read by | What it controls |
 |---|---|---|---|
-| `AGENTS.md` | Repo-wide | Copilot agent mode, Claude Code, any AI agent | Master policy: what AI may/may not generate, prohibited patterns, tagging requirement, escalation process |
-| `.github/copilot-instructions.md` | IDE (every suggestion) | GitHub Copilot in VS Code / JetBrains | Inline rules: tagging format, security rules, testing rules, code style — applied to every autocomplete |
+| [AGENTS.md](../AGENTS.md) | Repo-wide | Copilot agent mode, Claude Code, any AI agent | Master policy: what AI may/may not generate, prohibited patterns, tagging requirement, escalation process |
+| [.github/copilot-instructions.md](../.github/copilot-instructions.md) | IDE (every suggestion) | GitHub Copilot in VS Code / JetBrains | Inline rules: tagging format, security rules, testing rules, code style — applied to every autocomplete |
 
 **Key difference:** `AGENTS.md` governs multi-step agent tasks.
 `copilot-instructions.md` governs every single line suggestion in the editor.
@@ -49,13 +49,13 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 
 | File | Applies | Triggered by | What it controls |
 |---|---|---|---|
-| `.githooks/pre-commit` | Local only | `git commit` | Warns if `reviewed by: <author>` placeholder is unfilled in staged files |
-| `pyproject.toml` | Local + CI | `pytest` | Enforces 90% minimum test coverage — fails the test run if not met |
-| `requirements.txt` | Local + CI | `pip install` | Pins exact versions of `bcrypt`, `pytest`, `pytest-cov`, `ruff` — prevents version drift |
+| [.githooks/pre-commit](../.githooks/pre-commit) | Local only | `git commit` | Warns if `reviewed by: <author>` placeholder is unfilled in staged files |
+| [pyproject.toml](../pyproject.toml) | Local + CI | `pytest` | Enforces 90% minimum test coverage — fails the test run if not met |
+| [requirements.txt](../requirements.txt) | Local + CI | `pip install` | Pins exact versions of `bcrypt`, `pytest`, `pytest-cov`, `ruff` — prevents version drift |
 
-> **Activation required:** `.githooks/pre-commit` only works after running
+> **Activation required:** [.githooks/pre-commit](../.githooks/pre-commit) only works after running
 > `git config core.hooksPath .githooks` once per developer machine.
-> This is documented in `docs/ai-onboarding.md` under "One-Time Local Setup".
+> This is documented in [docs/ai-onboarding.md](ai-onboarding.md) under "One-Time Local Setup".
 
 ---
 
@@ -63,12 +63,12 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 
 | File | Applies | Triggered by | What it controls |
 |---|---|---|---|
-| `.github/workflows/ai-guardrails-ci.yml` | GitHub Actions | Every PR + push to `main` | Runs 7 automated jobs (see breakdown below) |
-| `.github/pull_request_template.md` | GitHub PR UI | Opening any PR | Forces AI disclosure checklist + security checklist to appear in every PR description |
-| `.github/CODEOWNERS` | GitHub merge rules | Every PR | Requires specific team members to approve changes to `AGENTS.md`, workflows, and `CODEOWNERS` itself |
+| [.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml) | GitHub Actions | Every PR + push to `main` | Runs 7 automated jobs (see breakdown below) |
+| [.github/pull_request_template.md](../.github/pull_request_template.md) | GitHub PR UI | Opening any PR | Forces AI disclosure checklist + security checklist to appear in every PR description |
+| [.github/CODEOWNERS](../.github/CODEOWNERS) | GitHub merge rules | Every PR | Requires specific team members to approve changes to `AGENTS.md`, workflows, and `CODEOWNERS` itself |
 | **Branch protection ruleset** (GitHub Settings) | GitHub merge button | Every merge attempt | Blocks direct pushes to `main`; requires all CI jobs to pass before merge is allowed |
 
-#### CI Workflow Jobs Breakdown (`.github/workflows/ai-guardrails-ci.yml`)
+#### CI Workflow Jobs Breakdown ([.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml))
 
 | Job name | Blocks merge | What it checks |
 |---|---|---|
@@ -86,9 +86,9 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 
 | File | Applies | Who uses it | What it guides |
 |---|---|---|---|
-| `docs/code-review-guidelines.md` | Code review | PR reviewers | How to spot AI-specific bugs, what requires senior sign-off, how to evaluate test quality |
-| `docs/testing-standards.md` | Development | Developers writing tests | Mandatory test categories, naming conventions, mutation testing guidance, QA sign-off matrix |
-| `docs/ai-onboarding.md` | Onboarding | New developers | Three-pass review rule, safe vs. unsafe Copilot usage patterns, practical exercises |
+| [docs/code-review-guidelines.md](code-review-guidelines.md) | Code review | PR reviewers | How to spot AI-specific bugs, what requires senior sign-off, how to evaluate test quality |
+| [docs/testing-standards.md](testing-standards.md) | Development | Developers writing tests | Mandatory test categories, naming conventions, mutation testing guidance, QA sign-off matrix |
+| [docs/ai-onboarding.md](ai-onboarding.md) | Onboarding | New developers | Three-pass review rule, safe vs. unsafe Copilot usage patterns, practical exercises |
 
 ---
 
@@ -172,17 +172,17 @@ These controls rely entirely on human judgment and team culture:
 
 | File | Layer | Location |
 |---|---|---|
-| `AGENTS.md` | AI Behavior | Repo root |
-| `.github/copilot-instructions.md` | AI Behavior | `.github/` |
-| `.githooks/pre-commit` | Local | `.githooks/` — activate with `git config core.hooksPath .githooks` |
-| `pyproject.toml` | Local + CI | Repo root |
-| `requirements.txt` | Local + CI | Repo root |
-| `.github/workflows/ai-guardrails-ci.yml` | GitHub CI | `.github/workflows/` |
-| `.github/pull_request_template.md` | GitHub PR | `.github/` |
-| `.github/CODEOWNERS` | GitHub merge | `.github/` |
-| `docs/code-review-guidelines.md` | Human process | `docs/` |
-| `docs/testing-standards.md` | Human process | `docs/` |
-| `docs/ai-onboarding.md` | Human process | `docs/` |
+| [AGENTS.md](../AGENTS.md) | AI Behavior | Repo root |
+| [.github/copilot-instructions.md](../.github/copilot-instructions.md) | AI Behavior | `.github/` |
+| [.githooks/pre-commit](../.githooks/pre-commit) | Local | `.githooks/` — activate with `git config core.hooksPath .githooks` |
+| [pyproject.toml](../pyproject.toml) | Local + CI | Repo root |
+| [requirements.txt](../requirements.txt) | Local + CI | Repo root |
+| [.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml) | GitHub CI | `.github/workflows/` |
+| [.github/pull_request_template.md](../.github/pull_request_template.md) | GitHub PR | `.github/` |
+| [.github/CODEOWNERS](../.github/CODEOWNERS) | GitHub merge | `.github/` |
+| [docs/code-review-guidelines.md](code-review-guidelines.md) | Human process | `docs/` |
+| [docs/testing-standards.md](testing-standards.md) | Human process | `docs/` |
+| [docs/ai-onboarding.md](ai-onboarding.md) | Human process | `docs/` |
 
 ---
 
