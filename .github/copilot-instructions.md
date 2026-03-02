@@ -40,6 +40,14 @@ function parseQueryString(raw: string): Record<string, string> {
 - Always validate and sanitize inputs at function boundaries
 - Escape all user-supplied strings before rendering in HTML contexts
 
+## Testing Rules (when generating tests)
+
+- Always generate tests for: happy path, empty/null inputs, boundary values, and error paths
+- Use scenario-based names: `test_<function>_when_<condition>_returns_<result>`
+- Never write tests that only test a mock — test real behaviour
+- Add at least one security edge case for any function that handles user input
+- Do not use `assert True` or trivially passing assertions
+
 ## Code Style
 
 - Follow existing patterns in the file being edited
