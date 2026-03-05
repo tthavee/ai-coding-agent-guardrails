@@ -54,7 +54,7 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 |---|---|---|---|
 | [.githooks/pre-commit](../.githooks/pre-commit) | Local only | `git commit` | Warns if `reviewed by: <author>` placeholder is unfilled in staged files |
 | [pyproject.toml](../pyproject.toml) | Local + CI (Python) | `pytest` | Enforces 80% minimum test coverage — fails the test run if not met |
-| `pom.xml` *(Java/Maven)* | Local + CI (Java) | `mvn verify` | JaCoCo plugin enforces 80% line coverage; pins all dependency versions |
+| [pom.xml](../pom.xml) *(Java/Maven)* | Local + CI (Java) | `mvn verify` | JaCoCo plugin enforces 80% line coverage; pins all dependency versions |
 | `build.gradle` / `build.gradle.kts` *(Java/Gradle)* | Local + CI (Java) | `./gradlew test` | JaCoCo coverage verification task; dependency version management |
 
 > **Activation required:** [.githooks/pre-commit](../.githooks/pre-commit) only works after running
@@ -215,7 +215,7 @@ These controls rely entirely on human judgment and team culture:
 | [.github/copilot-instructions.md](../.github/copilot-instructions.md) | AI Behavior | `.github/` |
 | [.githooks/pre-commit](../.githooks/pre-commit) | Local | `.githooks/` — activate with `git config core.hooksPath .githooks` |
 | [pyproject.toml](../pyproject.toml) | Local + CI (Python) | Repo root |
-| `pom.xml` *(Java/Maven)* | Local + CI (Java) | Repo root |
+| [pom.xml](../pom.xml) *(Java/Maven)* | Local + CI (Java) | Repo root |
 | `build.gradle` / `build.gradle.kts` *(Java/Gradle)* | Local + CI (Java) | Repo root |
 | [.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml) | GitHub CI | `.github/workflows/` |
 | [.github/pull_request_template.md](../.github/pull_request_template.md) | GitHub PR | `.github/` |
