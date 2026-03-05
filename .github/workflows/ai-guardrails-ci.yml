@@ -65,6 +65,18 @@ jobs:
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
+      # Java (Maven) projects
+      - name: OWASP dependency-check (if Maven project)
+        if: hashFiles('pom.xml') != ''
+        run: |
+          mvn org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7
+
+      # Java (Gradle) projects
+      - name: OWASP dependency-check (if Gradle project)
+        if: hashFiles('build.gradle') != '' || hashFiles('build.gradle.kts') != ''
+        run: |
+          ./gradlew dependencyCheckAnalyze
+
   # ──────────────────────────────────────────────
   # 3. SAST — Static Application Security Testing
   # ──────────────────────────────────────────────
@@ -137,6 +149,34 @@ jobs:
             exit 1
           fi
 
+      # ----- Java (Maven) -----
+      - name: Setup Java (if Maven project)
+        if: hashFiles('pom.xml') != ''
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Run Java tests with coverage (Maven)
+        if: hashFiles('pom.xml') != ''
+        run: |
+          mvn verify jacoco:report
+          # Fail if line coverage < 80% (requires jacoco-maven-plugin configured in pom.xml)
+          mvn jacoco:check
+
+      # ----- Java (Gradle) -----
+      - name: Setup Java (if Gradle project)
+        if: hashFiles('build.gradle') != '' || hashFiles('build.gradle.kts') != ''
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Run Java tests with coverage (Gradle)
+        if: hashFiles('build.gradle') != '' || hashFiles('build.gradle.kts') != ''
+        run: |
+          ./gradlew test jacocoTestReport jacocoTestCoverageVerification
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -169,6 +209,16 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: latest
+
+      - name: Lint (Java — Checkstyle + SpotBugs via Maven)
+        if: hashFiles('pom.xml') != ''
+        run: |
+          mvn checkstyle:check spotbugs:check
+
+      - name: Lint (Java — Checkstyle + SpotBugs via Gradle)
+        if: hashFiles('build.gradle') != '' || hashFiles('build.gradle.kts') != ''
+        run: |
+          ./gradlew checkstyleMain spotbugsMain
 
   # ──────────────────────────────────────────────
   # 6. PR Policy Checks

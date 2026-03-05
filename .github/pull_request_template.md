@@ -11,7 +11,7 @@
 
 ## Testing
 <!-- How was this tested? -->
-- [ ] Unit tests pass locally (`npm test` / `pytest` / `go test ./...`)
+- [ ] Unit tests pass locally (`npm test` / `pytest` / `go test ./...` / `mvn test` / `./gradlew test`)
 - [ ] New tests added for new logic
 - [ ] Manual testing performed (describe below)
 

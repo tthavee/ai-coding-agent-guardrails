@@ -30,16 +30,27 @@ Coverage alone is insufficient. Coverage checks run in CI but reviewers must als
 For every function or module where Copilot generated substantial code, tests MUST include:
 
 ### 1. Happy Path
-```
-# The expected, normal use case
+
+Python:
+```python
 def test_parse_user_input_valid():
     result = parse_user_input("john@example.com")
     assert result.email == "john@example.com"
 ```
 
-### 2. Edge Cases (required — AI almost always misses these)
+Java (JUnit 5):
+```java
+@Test
+void givenValidEmail_whenParseUserInput_thenReturnsUser() {
+    User result = parseUserInput("john@example.com");
+    assertEquals("john@example.com", result.getEmail());
+}
 ```
-# Empty, null, boundary values
+
+### 2. Edge Cases (required — AI almost always misses these)
+
+Python:
+```python
 def test_parse_user_input_empty_string():
     with pytest.raises(ValueError, match="Input cannot be empty"):
         parse_user_input("")
@@ -54,25 +65,68 @@ def test_parse_user_input_max_length():
         parse_user_input(long_email)
 ```
 
-### 3. Error Paths
+Java (JUnit 5):
+```java
+@Test
+void givenEmptyString_whenParseUserInput_thenThrowsIllegalArgument() {
+    assertThrows(IllegalArgumentException.class, () -> parseUserInput(""));
+}
+
+@Test
+void givenNull_whenParseUserInput_thenThrowsNullPointer() {
+    assertThrows(NullPointerException.class, () -> parseUserInput(null));
+}
+
+@Test
+void givenMaxLengthExceeded_whenParseUserInput_thenThrowsIllegalArgument() {
+    String longEmail = "a".repeat(255) + "@example.com";
+    assertThrows(IllegalArgumentException.class, () -> parseUserInput(longEmail));
+}
 ```
-# What happens when dependencies fail?
+
+### 3. Error Paths
+
+Python:
+```python
 def test_parse_user_input_invalid_format():
     with pytest.raises(ValueError, match="Invalid email format"):
         parse_user_input("not-an-email")
 ```
 
-### 4. Security Edge Cases (for any input-handling code)
+Java (JUnit 5):
+```java
+@Test
+void givenInvalidFormat_whenParseUserInput_thenThrowsIllegalArgument() {
+    assertThrows(IllegalArgumentException.class, () -> parseUserInput("not-an-email"));
+}
 ```
-# Injection, traversal, encoding attacks
+
+### 4. Security Edge Cases (for any input-handling code)
+
+Python:
+```python
 def test_parse_user_input_sql_injection_attempt():
     result = parse_user_input("user@example.com'; DROP TABLE users;--")
-    # Should either sanitize or reject — never pass raw to DB
     assert "DROP TABLE" not in result.email
 
 def test_parse_user_input_xss_attempt():
     result = parse_user_input("<script>alert('xss')</script>@example.com")
     assert "<script>" not in result.email
+```
+
+Java (JUnit 5):
+```java
+@Test
+void givenSqlInjectionAttempt_whenParseUserInput_thenSanitizedOrRejected() {
+    assertThrows(IllegalArgumentException.class,
+        () -> parseUserInput("user@example.com'; DROP TABLE users;--"));
+}
+
+@Test
+void givenXssAttempt_whenParseUserInput_thenSanitizedOrRejected() {
+    assertThrows(IllegalArgumentException.class,
+        () -> parseUserInput("<script>alert('xss')</script>@example.com"));
+}
 ```
 
 ---
@@ -81,16 +135,29 @@ def test_parse_user_input_xss_attempt():
 
 Use the **Given-When-Then** or **Scenario** pattern in test names:
 
+Python / Go:
 ```
-# Good — describes the scenario and expected outcome
+# Good
 test_calculate_discount_when_user_is_premium_returns_20_percent()
 test_create_order_when_stock_is_zero_raises_out_of_stock_error()
 test_authenticate_when_token_is_expired_returns_401()
 
-# Bad — only describes the function
+# Bad
 test_calculate_discount()
 test_create_order()
 test_authenticate()
+```
+
+Java (JUnit 5):
+```java
+// Good
+@Test void givenPremiumUser_whenCalculateDiscount_thenReturns20Percent() {}
+@Test void givenZeroStock_whenCreateOrder_thenThrowsOutOfStockException() {}
+@Test void givenExpiredToken_whenAuthenticate_thenReturns401() {}
+
+// Bad
+@Test void testCalculateDiscount() {}
+@Test void testCreateOrder() {}
 ```
 
 ---
@@ -140,6 +207,11 @@ npx stryker run
 # Go
 go install github.com/zimmski/go-mutesting/...@latest
 go-mutesting ./pkg/yourpackage/...
+
+# Java (PIT Mutation Testing — add to pom.xml or build.gradle, then run)
+mvn org.pitest:pitest-maven:mutationCoverage
+# or with Gradle:
+./gradlew pitest
 ```
 
 A mutation score below **70%** on an AI-generated module is a signal that tests need significant manual improvement.
@@ -167,8 +239,8 @@ The following CI checks are mandatory and block merge if they fail:
 - Coverage threshold check
 - Linting (no suppressed rules without justification)
 - Secret scanning (detect-secrets / gitleaks)
-- Dependency vulnerability scan (npm audit / safety / govulncheck)
-- SAST scan (semgrep / CodeQL)
+- Dependency vulnerability scan (npm audit / safety / govulncheck / mvn dependency-check)
+- SAST scan (semgrep / CodeQL / SpotBugs)
 ```
 
 Tests that are skipped to make CI pass will be flagged in PR review.

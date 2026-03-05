@@ -55,10 +55,20 @@ AI-generated code frequently handles only the happy path.
 This forces you to think about the contract before accepting suggestions.
 
 **Use inline comments to constrain Copilot:**
+
+Python:
 ```python
 # Parse the ISO 8601 date string and return None if invalid (do not raise)
 def parse_date(date_str: str) -> datetime | None:
     # Copilot suggestion will be constrained by your comment
+```
+
+Java:
+```java
+// Parse ISO 8601 date string; return Optional.empty() if invalid — do not throw
+public Optional<LocalDate> parseDate(String dateStr) {
+    // Copilot suggestion will be constrained by your comment
+}
 ```
 
 **Reject suggestions you can't explain in 30 seconds.** If a reviewer asks you why line 47 does what it does, you need an answer.
@@ -69,6 +79,8 @@ def parse_date(date_str: str) -> datetime | None:
 
 If a suggestion:
 - Uses `eval()`, `exec()`, or `subprocess` with string concatenation → **always reject**
+- Uses `Runtime.exec()` or `ProcessBuilder` with unsanitized input (Java) → **always reject**
+- Uses `Statement` instead of `PreparedStatement` for SQL (Java) → **always reject**
 - Imports a package you don't recognize → **look it up before accepting**
 - Appears to disable a linter rule → **understand why before accepting**
 - Hardcodes a value that looks like a credential → **reject and rotate the credential if it was real**

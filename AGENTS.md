@@ -43,7 +43,7 @@ All of the above require a **senior developer sign-off** in the PR review (see `
 Before committing any AI-generated or AI-assisted code, the developer MUST:
 
 1. **Read and understand** every line — if you cannot explain it, do not commit it
-2. **Run the full test suite locally** — `npm test` / `pytest` / `go test ./...` (see project README)
+2. **Run the full test suite locally** — `npm test` / `pytest` / `go test ./...` / `mvn test` / `./gradlew test` (see project README)
 3. **Write or update unit tests** — AI-suggested logic must have human-authored tests covering edge cases
 4. **Check for hardcoded values** — secrets, localhost URLs, test credentials must never be committed
 5. **Verify imports and dependencies** — Copilot sometimes imports packages that don't exist or aren't approved
@@ -72,10 +72,41 @@ Copilot agents must not generate, and developers must reject suggestions contain
 
 | Scenario | Requirement |
 |---|---|
-| >50% of a function is AI-generated | Developer must add an inline comment explaining the logic |
+| >50% of a function is AI-generated | Developer must add a `# Logic:` comment at the top of the function body explaining what the code does in their own words (see format below) |
 | Entire file is AI-generated | Mandatory senior review + documentation of why |
 | AI-generated test file | Developer must add at least 3 additional edge-case tests manually |
 | AI-suggested dependency added | Must be approved via the dependency review process (`docs/dependency-policy.md`) |
+
+### `# Logic:` Comment Format
+
+When >50% of a function is AI-generated, add a `# Logic:` comment at the top of the function body — written by the developer, not the AI. This is proof of comprehension, not a summary Copilot generates.
+
+```python
+def calculate_total(order: Order) -> float:
+    # Logic: sums quantity × unit_price for each item, rounds to 2 decimal
+    #        places to avoid floating-point drift. Returns 0.0 for empty orders.
+    # generated: copilot — reviewed by: yourname
+    if not order.items:
+        return 0.0
+    total = sum(item.quantity * item.unit_price for item in order.items)
+    return round(total, 2)
+    # end generated: copilot
+```
+
+Example (Java):
+```java
+public BigDecimal calculateTotal(Order order) {
+    // Logic: streams items, multiplies qty × unitPrice, sums to BigDecimal,
+    //        returns ZERO for empty orders to avoid null downstream.
+    // generated: copilot — reviewed by: yourname
+    return order.getItems().stream()
+        .map(i -> i.getUnitPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    // end generated: copilot
+}
+```
+
+The comment must be in the developer's own words. Do not copy the docstring or let the AI generate it.
 
 ---
 
@@ -87,7 +118,9 @@ When operating in **agent mode** (multi-step autonomous tasks), Copilot MUST:
 - Stop and request human confirmation before modifying CI/CD configuration
 - Never commit or push directly — all changes go through PRs
 - Never modify `.github/`, `AGENTS.md`, or any security configuration file
-- Annotate all generated code blocks with a trailing comment: `# generated: copilot — reviewed by: <author>`
+- Annotate all generated code blocks with a trailing comment:
+  - Python / Go / Ruby: `# generated: copilot — reviewed by: <author>`
+  - Java / JavaScript / TypeScript / C#: `// generated: copilot — reviewed by: <author>`
 
 ---
 
