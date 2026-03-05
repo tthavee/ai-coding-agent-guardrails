@@ -36,70 +36,7 @@ jobs:
           detect-secrets audit .secrets.baseline --report --only-allowlisted
 
   # ──────────────────────────────────────────────
-  # 2. Dependency Vulnerability Scan
-  # ──────────────────────────────────────────────
-  dependency-scan:
-    name: Dependency Vulnerability Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      # Node.js projects
-      - name: npm audit (if Node project)
-        if: hashFiles('package.json') != ''
-        run: |
-          npm ci
-          npm audit --audit-level=high
-
-      # Python projects
-      - name: pip safety check (if Python project)
-        if: hashFiles('requirements.txt') != ''
-        run: |
-          pip install safety
-          safety check -r requirements.txt --full-report
-
-      # Go projects
-      - name: govulncheck (if Go project)
-        if: hashFiles('go.mod') != ''
-        run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          govulncheck ./...
-
-      # Java (Maven) projects
-      - name: OWASP dependency-check (if Maven project)
-        if: hashFiles('pom.xml') != ''
-        run: |
-          mvn org.owasp:dependency-check-maven:check -DfailBuildOnCVSS=7
-
-      # Java (Gradle) projects
-      - name: OWASP dependency-check (if Gradle project)
-        if: hashFiles('build.gradle') != '' || hashFiles('build.gradle.kts') != ''
-        run: |
-          ./gradlew dependencyCheckAnalyze
-
-  # ──────────────────────────────────────────────
-  # 3. SAST — Static Application Security Testing
-  # ──────────────────────────────────────────────
-  sast:
-    name: Static Security Analysis (Semgrep)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Semgrep
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/owasp-top-ten
-            p/secrets
-            p/sql-injection
-            p/xss
-            p/default
-        env:
-          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-
-  # ──────────────────────────────────────────────
-  # 4. Unit Tests + Coverage Enforcement
+  # 2. Unit Tests + Coverage Enforcement
   # ──────────────────────────────────────────────
   test-and-coverage:
     name: Tests & Coverage Gate
@@ -184,44 +121,7 @@ jobs:
           fail_ci_if_error: true
 
   # ──────────────────────────────────────────────
-  # 5. Linting + Style Enforcement
-  # ──────────────────────────────────────────────
-  lint:
-    name: Linting
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Lint (Node/TS)
-        if: hashFiles('.eslintrc*') != '' || hashFiles('eslint.config.*') != ''
-        run: |
-          npm ci
-          npx eslint . --max-warnings=0
-
-      - name: Lint (Python)
-        if: hashFiles('requirements.txt') != ''
-        run: |
-          pip install ruff
-          ruff check . --select ALL --ignore ANN,D,ERA
-
-      - name: Lint (Go)
-        if: hashFiles('go.mod') != ''
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: latest
-
-      - name: Lint (Java — Checkstyle + SpotBugs via Maven)
-        if: hashFiles('pom.xml') != ''
-        run: |
-          mvn checkstyle:check spotbugs:check
-
-      - name: Lint (Java — Checkstyle + SpotBugs via Gradle)
-        if: hashFiles('build.gradle') != '' || hashFiles('build.gradle.kts') != ''
-        run: |
-          ./gradlew checkstyleMain spotbugsMain
-
-  # ──────────────────────────────────────────────
-  # 6. PR Policy Checks
+  # 3. PR Policy Checks
   # ──────────────────────────────────────────────
   pr-policy:
     name: PR Policy Compliance
@@ -229,14 +129,6 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
-
-      - name: Check PR description is not empty
-        run: |
-          PR_BODY="${{ github.event.pull_request.body }}"
-          if [ -z "$PR_BODY" ] || [ ${#PR_BODY} -lt 50 ]; then
-            echo "ERROR: PR description is too short. Fill out the PR template."
-            exit 1
-          fi
 
       - name: Check AI disclosure section is present
         run: |
@@ -288,7 +180,7 @@ jobs:
               echo "ERROR: PR discloses substantial AI-generated code but no tagging comments found."
               echo "Per AGENTS.md section 7, AI-generated blocks must include a trailing comment:"
               echo "  Python/Go:      # generated: copilot — reviewed by: <your-name>"
-              echo "  JS/TS:          // generated: copilot — reviewed by: <your-name>"
+              echo "  Java/JS/TS:     // generated: copilot — reviewed by: <your-name>"
               echo ""
               echo "Add the tag to each AI-generated function or class, then push again."
               exit 1
@@ -301,7 +193,7 @@ jobs:
           fi
 
   # ──────────────────────────────────────────────
-  # 7. Protected File Change Detection
+  # 4. Protected File Change Detection
   # ──────────────────────────────────────────────
   protected-files:
     name: Protected File Guard

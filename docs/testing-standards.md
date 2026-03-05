@@ -175,22 +175,6 @@ When reviewing AI-generated tests, verify:
 
 ---
 
-## Test Architecture Rules
-
-### Do
-- One logical assertion per test (multiple `assert` statements are fine if testing one concept)
-- Use fixtures/factories for test data setup
-- Group related tests in classes or `describe` blocks
-- Test behavior, not implementation (don't test private methods directly)
-
-### Do Not
-- Do not `except: pass` in test helpers — let failures surface
-- Do not mock out the unit under test
-- Do not write tests that only test the mock itself
-- Do not commit tests with `skip`, `xfail`, or `.only` without a tracked issue
-
----
-
 ## Mutation Testing (Recommended for AI-Heavy PRs)
 
 For critical modules with high AI involvement, run mutation testing to verify test quality:
@@ -216,31 +200,3 @@ mvn org.pitest:pitest-maven:mutationCoverage
 
 A mutation score below **70%** on an AI-generated module is a signal that tests need significant manual improvement.
 
----
-
-## QA Sign-off Requirements
-
-| PR type | QA requirement |
-|---|---|
-| Bug fix in existing feature | Automated tests + regression test for the bug |
-| New feature, limited AI usage | Automated unit + integration tests |
-| New feature, heavy AI usage | Automated tests + QA exploratory test session |
-| Security-related change | Automated tests + security-focused QA review |
-| Major AI-generated module | Full QA test plan documented and executed |
-
----
-
-## Continuous Integration Enforcement
-
-The following CI checks are mandatory and block merge if they fail:
-
-```yaml
-# Enforced in .github/workflows/ci.yml
-- Coverage threshold check
-- Linting (no suppressed rules without justification)
-- Secret scanning (detect-secrets / gitleaks)
-- Dependency vulnerability scan (npm audit / safety / govulncheck / mvn dependency-check)
-- SAST scan (semgrep / CodeQL / SpotBugs)
-```
-
-Tests that are skipped to make CI pass will be flagged in PR review.

@@ -1,22 +1,9 @@
 # Pull Request
 
-## Summary
-<!-- What does this PR do? Why is this change needed? -->
-
-
-## Changes
-<!-- Bullet list of key changes -->
--
--
-
 ## Testing
-<!-- How was this tested? -->
 - [ ] Unit tests pass locally (`npm test` / `pytest` / `go test ./...` / `mvn test` / `./gradlew test`)
 - [ ] New tests added for new logic
-- [ ] Manual testing performed (describe below)
-
-**Manual test notes:**
-
+- [ ] Edge cases covered (empty/null inputs, boundary values, error paths)
 
 ---
 
@@ -40,8 +27,8 @@
 **AI-generated files or functions** (list them):
 ```
 # Example:
-# src/utils/parser.ts — parseQueryString() function
-# tests/parser.test.ts — scaffold generated, edge cases added manually
+# src/OrderProcessor.java — calculateTotal() method
+# tests/OrderProcessorTest.java — scaffold generated, edge cases added manually
 ```
 
 **Developer verification checklist:**
@@ -56,19 +43,7 @@
 
 ## Security Checklist
 - [ ] No secrets, tokens, or credentials committed
-- [ ] No `eval()`, `exec()`, or dynamic code execution with user input
-- [ ] SQL uses parameterized queries (no string concatenation)
+- [ ] No `eval()`, `exec()`, `Runtime.exec()`, or dynamic code execution with user input
+- [ ] SQL uses parameterized queries / `PreparedStatement` (no string concatenation)
 - [ ] External inputs are validated and sanitized
-- [ ] No `console.log`/`print` of PII or sensitive data
-
----
-
-## Reviewer Notes
-<!-- Anything specific you want reviewers to focus on? -->
-
-
----
-
-## Related Issues / Tickets
-<!-- Link to Jira/GitHub issues -->
-Closes #
+- [ ] No `console.log`/`print`/logger output of PII or sensitive data

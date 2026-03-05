@@ -66,8 +66,3 @@ public BigDecimal calculateTotal(Order order) {
 - Add at least one security edge case for any function that handles user input
 - Do not use `assert True` or trivially passing assertions
 
-## Code Style
-
-- Follow existing patterns in the file being edited
-- Prefer explicit error handling over silent failures
-- Match the naming conventions already present in the codebase
