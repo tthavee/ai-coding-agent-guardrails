@@ -16,6 +16,7 @@ import bcrypt  # generated: copilot — reviewed by: tthavee
 MAX_EMAIL_LENGTH = 254  # RFC 5321 limit
 MAX_USERNAME_LENGTH = 50
 MIN_PASSWORD_LENGTH = 8
+MAX_PASSWORD_LENGTH = 128  # bcrypt silently truncates beyond 72 bytes; hard cap prevents DoS
 _EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 
 
@@ -70,6 +71,32 @@ def validate_username(username: str) -> str:
     return username
 
 
+def validate_password(password: str) -> str:
+    """
+    Validate a password meets length requirements.
+
+    Returns the password unchanged on success.
+    Raises TypeError for non-string input, ValidationError if length is out of range.
+    """
+    # Logic: rejects None/non-string early via TypeError; enforces MIN (8) and MAX (128)
+    #        length bounds — MAX guards against bcrypt DoS on inputs > 72 bytes.
+    # generated: copilot — reviewed by: <author>
+    if password is None:
+        raise TypeError("password must be a string, got None")
+    if not isinstance(password, str):
+        raise TypeError(f"password must be a string, got {type(password).__name__}")
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise ValidationError(
+            f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+        )
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise ValidationError(
+            f"Password must not exceed {MAX_PASSWORD_LENGTH} characters"
+        )
+    return password
+    # end generated: copilot
+
+
 def hash_password(plain_text: str) -> bytes:
     """
     Hash a password using bcrypt with a random salt.
@@ -77,12 +104,7 @@ def hash_password(plain_text: str) -> bytes:
     Never stores plain text. Never uses MD5 or SHA1.
     Raises ValidationError if password does not meet minimum requirements.
     """
-    if plain_text is None:
-        raise TypeError("password must be a string, got None")
-    if len(plain_text) < MIN_PASSWORD_LENGTH:
-        raise ValidationError(
-            f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
-        )
+    validate_password(plain_text)
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(plain_text.encode("utf-8"), salt)
 

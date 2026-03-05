@@ -14,7 +14,99 @@ concurrency:
 jobs:
 
   # ──────────────────────────────────────────────
-  # 1. Secret Scanning — blocks on any detected secret
+  # 1. PR Policy Checks — AI disclosure + security checklist
+  # ──────────────────────────────────────────────
+  pr-policy:
+    name: PR Policy Compliance
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check AI disclosure section is present
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+          if ! echo "$PR_BODY" | grep -q "AI Assistance Disclosure"; then
+            echo "ERROR: PR template's 'AI Assistance Disclosure' section is missing."
+            echo "Please use the PR template and complete the AI disclosure section."
+            exit 1
+          fi
+
+      - name: Check security checklist is completed
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+          # Detect unchecked security items (lines starting with "- [ ]" in security section)
+          UNCHECKED=$(echo "$PR_BODY" | grep -A 20 "Security Checklist" | grep -c "- \[ \]" || true)
+          if [ "$UNCHECKED" -gt 0 ]; then
+            echo "ERROR: $UNCHECKED item(s) in the Security Checklist are unchecked."
+            exit 1
+          fi
+
+      - name: Check AI-generated code is tagged when substantial AI usage is disclosed
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce AI tagging in diff
+        run: |
+          PR_BODY="${{ github.event.pull_request.body }}"
+
+          # Determine AI involvement level from checked boxes in PR template
+          SUBSTANTIAL=0
+          AGENT_MODE=0
+
+          # Check if "Copilot generated substantial function/class bodies" is checked
+          if echo "$PR_BODY" | grep -q "\- \[x\] Copilot generated substantial"; then
+            SUBSTANTIAL=1
+          fi
+          # Check if "Copilot Agent ran multi-step autonomous tasks" is checked
+          if echo "$PR_BODY" | grep -q "\- \[x\] Copilot Agent ran"; then
+            AGENT_MODE=1
+          fi
+
+          if [ "$SUBSTANTIAL" -eq 1 ] || [ "$AGENT_MODE" -eq 1 ]; then
+            echo "Substantial or agent-mode AI usage disclosed. Checking for '# generated: copilot' tags..."
+            DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- '*.py' '*.ts' '*.js' '*.go' '*.java')
+
+            if ! echo "$DIFF" | grep -q "generated: copilot"; then
+              echo ""
+              echo "ERROR: PR discloses substantial AI-generated code but no tagging comments found."
+              echo "Per AGENTS.md section 7, AI-generated blocks must include a trailing comment:"
+              echo "  Python/Go:      # generated: copilot — reviewed by: <your-name>"
+              echo "  Java/JS/TS:     // generated: copilot — reviewed by: <your-name>"
+              echo ""
+              echo "Add the tag to each AI-generated function or class, then push again."
+              exit 1
+            fi
+
+            TAG_COUNT=$(echo "$DIFF" | grep -c "generated: copilot" || true)
+            echo "OK: Found $TAG_COUNT 'generated: copilot' tag(s) in the diff."
+          else
+            echo "No substantial AI usage disclosed — tagging check skipped."
+          fi
+
+  # ──────────────────────────────────────────────
+  # 2. AI Tag Enforcement — every new function must be attributed
+  # ──────────────────────────────────────────────
+  ai-tag-enforcement:
+    name: AI Tag Enforcement
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check attribution tags on all new Python and Java functions
+        run: |
+          python scripts/check_ai_tags.py origin/${{ github.base_ref }}
+
+  # ──────────────────────────────────────────────
+  # 3. Secret Scanning — blocks on any detected secret
   # ──────────────────────────────────────────────
   secret-scan:
     name: Secret Scanning
@@ -36,7 +128,7 @@ jobs:
           detect-secrets audit .secrets.baseline --report --only-allowlisted
 
   # ──────────────────────────────────────────────
-  # 2. Unit Tests + Coverage Enforcement
+  # 4. Unit Tests + Coverage Enforcement
   # ──────────────────────────────────────────────
   test-and-coverage:
     name: Tests & Coverage Gate
@@ -121,79 +213,7 @@ jobs:
           fail_ci_if_error: true
 
   # ──────────────────────────────────────────────
-  # 3. PR Policy Checks
-  # ──────────────────────────────────────────────
-  pr-policy:
-    name: PR Policy Compliance
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check AI disclosure section is present
-        run: |
-          PR_BODY="${{ github.event.pull_request.body }}"
-          if ! echo "$PR_BODY" | grep -q "AI Assistance Disclosure"; then
-            echo "ERROR: PR template's 'AI Assistance Disclosure' section is missing."
-            echo "Please use the PR template and complete the AI disclosure section."
-            exit 1
-          fi
-
-      - name: Check security checklist is completed
-        run: |
-          PR_BODY="${{ github.event.pull_request.body }}"
-          # Detect unchecked security items (lines starting with "- [ ]" in security section)
-          UNCHECKED=$(echo "$PR_BODY" | grep -A 20 "Security Checklist" | grep -c "- \[ \]" || true)
-          if [ "$UNCHECKED" -gt 0 ]; then
-            echo "ERROR: $UNCHECKED item(s) in the Security Checklist are unchecked."
-            exit 1
-          fi
-
-      - name: Check AI-generated code is tagged when substantial AI usage is disclosed
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Enforce AI tagging in diff
-        run: |
-          PR_BODY="${{ github.event.pull_request.body }}"
-
-          # Determine AI involvement level from checked boxes in PR template
-          SUBSTANTIAL=0
-          AGENT_MODE=0
-
-          # Check if "Copilot generated substantial function/class bodies" is checked
-          if echo "$PR_BODY" | grep -q "\- \[x\] Copilot generated substantial"; then
-            SUBSTANTIAL=1
-          fi
-          # Check if "Copilot Agent ran multi-step autonomous tasks" is checked
-          if echo "$PR_BODY" | grep -q "\- \[x\] Copilot Agent ran"; then
-            AGENT_MODE=1
-          fi
-
-          if [ "$SUBSTANTIAL" -eq 1 ] || [ "$AGENT_MODE" -eq 1 ]; then
-            echo "Substantial or agent-mode AI usage disclosed. Checking for '# generated: copilot' tags..."
-            DIFF=$(git diff origin/${{ github.base_ref }}...HEAD -- '*.py' '*.ts' '*.js' '*.go' '*.java')
-
-            if ! echo "$DIFF" | grep -q "generated: copilot"; then
-              echo ""
-              echo "ERROR: PR discloses substantial AI-generated code but no tagging comments found."
-              echo "Per AGENTS.md section 7, AI-generated blocks must include a trailing comment:"
-              echo "  Python/Go:      # generated: copilot — reviewed by: <your-name>"
-              echo "  Java/JS/TS:     // generated: copilot — reviewed by: <your-name>"
-              echo ""
-              echo "Add the tag to each AI-generated function or class, then push again."
-              exit 1
-            fi
-
-            TAG_COUNT=$(echo "$DIFF" | grep -c "generated: copilot" || true)
-            echo "OK: Found $TAG_COUNT 'generated: copilot' tag(s) in the diff."
-          else
-            echo "No substantial AI usage disclosed — tagging check skipped."
-          fi
-
-  # ──────────────────────────────────────────────
-  # 4. Protected File Change Detection
+  # 5. Protected File Change Detection
   # ──────────────────────────────────────────────
   protected-files:
     name: Protected File Guard

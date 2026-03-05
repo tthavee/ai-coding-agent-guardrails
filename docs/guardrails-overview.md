@@ -41,10 +41,10 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 | File | Applies | Read by | What it controls |
 |---|---|---|---|
 | [AGENTS.md](../AGENTS.md) | Repo-wide | Copilot agent mode, Claude Code, any AI agent | Master policy: what AI may/may not generate, prohibited patterns, tagging requirement, escalation process |
+| [CLAUDE.md](../CLAUDE.md) | Repo-wide | Claude Code (every session) | Hard rules for Claude Code: mandatory attribution tagging on first write, `# Logic:` comment requirement, `# human-authored` declaration, pre-flight checklist |
 | [.github/copilot-instructions.md](../.github/copilot-instructions.md) | IDE (every suggestion) | GitHub Copilot in VS Code / JetBrains | Inline rules: tagging format, security rules, testing rules — applied to every autocomplete |
 
-**Key difference:** `AGENTS.md` governs multi-step agent tasks.
-`copilot-instructions.md` governs every single line suggestion in the editor.
+**Key difference:** `AGENTS.md` governs multi-step agent tasks. `CLAUDE.md` governs Claude Code specifically — its rules are loaded every session and are treated as binding instructions, not suggestions. `copilot-instructions.md` governs every single line suggestion in the editor.
 
 ---
 
@@ -67,7 +67,7 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 
 | File | Applies | Triggered by | What it controls |
 |---|---|---|---|
-| [.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml) | GitHub Actions | Every PR + push to `main` | Runs 4 automated jobs (see breakdown below) |
+| [.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml) | GitHub Actions | Every PR + push to `main` | Runs 5 automated jobs (see breakdown below) |
 | [.github/pull_request_template.md](../.github/pull_request_template.md) | GitHub PR UI | Opening any PR | Forces AI disclosure checklist + security checklist to appear in every PR description |
 | [.github/CODEOWNERS](../.github/CODEOWNERS) | GitHub merge rules | Every PR | Requires specific team members to approve changes to `AGENTS.md`, workflows, and `CODEOWNERS` itself |
 | **Branch protection ruleset** (GitHub Settings) | GitHub merge button | Every merge attempt | Blocks direct pushes to `main`; requires all CI jobs to pass before merge is allowed |
@@ -79,6 +79,7 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 | `Secret Scanning` | Yes | Gitleaks + detect-secrets scan entire diff for credentials, tokens, API keys |
 | `Tests & Coverage Gate` | Yes | Runs pytest / mvn / gradle / jest / go test with JaCoCo/pytest-cov; fails if coverage drops below 80% |
 | `PR Policy Compliance` | Yes | Verifies AI disclosure section present, security checklist fully checked, AI tagging present when substantial AI usage is declared |
+| `AI Tag Enforcement` | Yes | Runs [scripts/check_ai_tags.py](../scripts/check_ai_tags.py) — blocks merge if any new Python function or Java method lacks `# generated: copilot` or `# human-authored` |
 | `Protected File Guard` | Yes | Blocks any PR that modifies `AGENTS.md`, `.github/workflows/`, or `CODEOWNERS` without escalation |
 
 ---
@@ -98,6 +99,7 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 | Control | Automatic? | What is needed |
 |---|---|---|
 | `AGENTS.md` read by Copilot agent | Yes | File must exist in repo root |
+| `CLAUDE.md` read by Claude Code | Yes | File must exist in repo root |
 | `copilot-instructions.md` read by Copilot | Yes | File must exist in `.github/` |
 | PR template loads on new PR | Yes | File must exist in `.github/` |
 | CI workflow triggers on PR | Yes | File must exist in `.github/workflows/` |
@@ -117,6 +119,7 @@ Developer writes code in IDE
         ▼
 .github/copilot-instructions.md  ← Copilot reads → shapes every suggestion
 AGENTS.md                        ← Copilot agent reads → constrains agent tasks
+CLAUDE.md                        ← Claude Code reads → enforces tagging on every generation
         │
         ▼
 Developer runs: git commit
@@ -135,10 +138,11 @@ Developer opens Pull Request
         ▼
 GitHub Actions CI runs automatically
         │
-        ├── Secret Scanning          ─┐
-        ├── Tests & Coverage Gate     ├── All must pass — merge is BLOCKED if any fail
-        ├── PR Policy Compliance      │
-        └── Protected File Guard     ─┘
+        ├── PR Policy Compliance      ─┐
+        ├── AI Tag Enforcement         │
+        ├── Secret Scanning            ├── All must pass — merge is BLOCKED if any fail
+        ├── Tests & Coverage Gate      │
+        └── Protected File Guard      ─┘
         │
         ▼
 Human Code Review
@@ -158,6 +162,7 @@ Merge to main ✅
 graph TD
     subgraph L1["Layer 1 — AI Behavior"]
         AGENTS["AGENTS.md\n(master policy)"]
+        CLAUDEMD["CLAUDE.md\n(Claude Code hard rules)"]
         COPILOT["copilot-instructions.md\n(per-suggestion rules)"]
     end
 
@@ -166,7 +171,8 @@ graph TD
     end
 
     subgraph L3["Layer 3 — GitHub CI"]
-        CI["ai-guardrails-ci.yml\n(4 jobs)"]
+        CI["ai-guardrails-ci.yml\n(5 jobs)"]
+        TAGS["check_ai_tags.py\n(hard tag enforcement)"]
         PR_TPL["pull_request_template.md\n(disclosure + security checklist)"]
         CODEOWNERS["CODEOWNERS\n(senior sign-off)"]
     end
@@ -178,9 +184,12 @@ graph TD
     end
 
     AGENTS -->|"read by Copilot agent\nconstrains agent tasks"| L2
+    CLAUDEMD -->|"read by Claude Code\nenforces tagging on every generation"| L2
     COPILOT -->|"read by Copilot IDE\nshapes every suggestion"| L2
 
     AGENTS -->|"tagging rules enforced by"| CI
+    CLAUDEMD -->|"tagging format defined for"| TAGS
+    TAGS -->|"runs as job in"| CI
     PR_TPL -->|"disclosure section checked by"| CI
     CODEOWNERS -->|"protects"| AGENTS
     CODEOWNERS -->|"protects"| CI
@@ -201,9 +210,9 @@ These controls rely entirely on human judgment and team culture:
 |---|---|
 | "Developer must understand every line" | No tool can verify comprehension |
 | Senior sign-off for auth/crypto changes | Requires human judgment on what constitutes a security-sensitive change |
-| All AI-generated lines are tagged | CI can only verify that *some* tags exist, not that *every* AI line is tagged |
+| `# Logic:` comment quality | CI verifies the comment exists; only a human can assess whether it reflects genuine understanding |
 | Code review quality | Tools can check coverage thresholds; only a human can assess whether tests are meaningful |
-| Copilot compliance with `AGENTS.md` | Copilot reads the file and tries to follow it, but it is guidance — not a hard filter |
+| Copilot compliance with `AGENTS.md` / `CLAUDE.md` | Both files are read by the AI and treated as binding rules, but AI instruction-following is not 100% reliable — human review remains the final check |
 
 ---
 
@@ -212,11 +221,13 @@ These controls rely entirely on human judgment and team culture:
 | File | Layer | Location |
 |---|---|---|
 | [AGENTS.md](../AGENTS.md) | AI Behavior | Repo root |
+| [CLAUDE.md](../CLAUDE.md) | AI Behavior (Claude Code) | Repo root |
 | [.github/copilot-instructions.md](../.github/copilot-instructions.md) | AI Behavior | `.github/` |
 | [.githooks/pre-commit](../.githooks/pre-commit) | Local | `.githooks/` — activate with `git config core.hooksPath .githooks` |
 | [pyproject.toml](../pyproject.toml) | Local + CI (Python) | Repo root |
 | [pom.xml](../pom.xml) *(Java/Maven)* | Local + CI (Java) | Repo root |
 | `build.gradle` / `build.gradle.kts` *(Java/Gradle)* | Local + CI (Java) | Repo root |
+| [scripts/check_ai_tags.py](../scripts/check_ai_tags.py) | GitHub CI | `scripts/` |
 | [.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml) | GitHub CI | `.github/workflows/` |
 | [.github/pull_request_template.md](../.github/pull_request_template.md) | GitHub PR | `.github/` |
 | [.github/CODEOWNERS](../.github/CODEOWNERS) | GitHub merge | `.github/` |
@@ -226,4 +237,4 @@ These controls rely entirely on human judgment and team culture:
 
 ---
 
-*Last updated: 2026-03-04 | Maintained by: Platform Engineering*
+*Last updated: 2026-03-05 | Maintained by: Platform Engineering*

@@ -12,14 +12,17 @@ across engineering teams — ensuring code quality, security, and developer acco
 ```
 .
 ├── AGENTS.md                             # Master AI policy (read by Copilot agents + Claude Code)
+├── CLAUDE.md                             # Claude Code hard rules: mandatory tagging on every generation
 ├── .github/
 │   ├── copilot-instructions.md           # Per-suggestion rules (read by Copilot in IDE)
 │   ├── CODEOWNERS                        # Protects policy files from unauthorized changes
 │   ├── pull_request_template.md          # AI disclosure + language-specific security checklist
 │   └── workflows/
-│       └── ai-guardrails-ci.yml          # CI: secret scan, coverage gate, PR policy, protected files
+│       └── ai-guardrails-ci.yml          # CI: secret scan, coverage gate, PR policy, tag enforcement, protected files
 ├── .githooks/
 │   └── pre-commit                        # Local: warns on unfilled AI tag <author> placeholder
+├── scripts/
+│   └── check_ai_tags.py                  # CI script: blocks PRs with untagged new functions
 └── docs/
     ├── guardrails-overview.md            # Full control map + file relationship diagram
     ├── ai-onboarding.md                  # Developer guide: how to use Copilot responsibly
@@ -31,10 +34,10 @@ across engineering teams — ensuring code quality, security, and developer acco
 
 | Layer | What enforces it | Purpose |
 |---|---|---|
-| **AI Behavior** | `AGENTS.md`, `copilot-instructions.md` | Shapes what Copilot generates before a developer sees it |
+| **AI Behavior** | `AGENTS.md`, `copilot-instructions.md`, `CLAUDE.md` | Shapes what AI generates; `CLAUDE.md` enforces tagging on every Claude Code generation |
 | **Local** | `.githooks/pre-commit`, `pom.xml`/`pyproject.toml` | Catches issues at commit time; enforces coverage thresholds |
 | **PR Gate** | `pull_request_template.md` | Forces AI disclosure + Java/Python security checklist on every PR |
-| **CI** | `ai-guardrails-ci.yml` (4 jobs) | Blocks merge on: secret leak, coverage drop, missing AI tags, protected file changes |
+| **CI** | `ai-guardrails-ci.yml` (5 jobs) | Blocks merge on: secret leak, coverage drop, untagged functions, missing AI disclosure, protected file changes |
 | **Human** | `docs/` | Trains developers and reviewers on AI-specific risks and standards |
 
 ## CI Jobs (all block merge on failure)
@@ -44,6 +47,7 @@ across engineering teams — ensuring code quality, security, and developer acco
 | Secret Scanning | Gitleaks + detect-secrets — credentials, tokens, API keys |
 | Tests & Coverage Gate | Java (JaCoCo) + Python (pytest-cov) — 80% line coverage minimum |
 | PR Policy Compliance | AI disclosure present, security checklist checked, AI tagging enforced |
+| AI Tag Enforcement | `scripts/check_ai_tags.py` — every new Python/Java function must have `# generated: copilot` or `# human-authored` |
 | Protected File Guard | Blocks changes to `AGENTS.md`, workflows, `CODEOWNERS` without escalation |
 
 ## One-Time Setup
