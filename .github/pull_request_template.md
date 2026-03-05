@@ -42,8 +42,17 @@
 ---
 
 ## Security Checklist
+
+**All languages:**
 - [ ] No secrets, tokens, or credentials committed
-- [ ] No `eval()`, `exec()`, `Runtime.exec()`, or dynamic code execution with user input
-- [ ] SQL uses parameterized queries / `PreparedStatement` (no string concatenation)
-- [ ] External inputs are validated and sanitized
-- [ ] No `console.log`/`print`/logger output of PII or sensitive data
+- [ ] External inputs are validated and sanitized at function boundaries
+
+**Java:**
+- [ ] No `Runtime.exec()` or `ProcessBuilder` with unsanitized input
+- [ ] SQL uses `PreparedStatement` — never `Statement` with string concatenation
+- [ ] No SLF4J/Log4j output of PII or sensitive data
+
+**Python:**
+- [ ] No `eval()`, `exec()`, or `os.system()` with user-controlled input
+- [ ] SQL uses parameterized queries — no f-string or `%` concatenation
+- [ ] No `print` statements containing PII or sensitive data

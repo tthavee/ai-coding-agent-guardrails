@@ -7,6 +7,9 @@ GitHub Copilot and other AI coding assistants across engineering teams. The
 guardrails are designed to prevent junior developers from passively accepting
 AI-generated code without understanding, reviewing, or testing it.
 
+**Primary language: Java.** All rules, examples, and CI checks cover Java (Maven/Gradle)
+alongside Python, Go, TypeScript, and JavaScript.
+
 The controls operate in four layers:
 
 1. **AI Behavior** — Instructions embedded in the repository that Copilot reads
@@ -38,7 +41,7 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 | File | Applies | Read by | What it controls |
 |---|---|---|---|
 | [AGENTS.md](../AGENTS.md) | Repo-wide | Copilot agent mode, Claude Code, any AI agent | Master policy: what AI may/may not generate, prohibited patterns, tagging requirement, escalation process |
-| [.github/copilot-instructions.md](../.github/copilot-instructions.md) | IDE (every suggestion) | GitHub Copilot in VS Code / JetBrains | Inline rules: tagging format, security rules, testing rules, code style — applied to every autocomplete |
+| [.github/copilot-instructions.md](../.github/copilot-instructions.md) | IDE (every suggestion) | GitHub Copilot in VS Code / JetBrains | Inline rules: tagging format, security rules, testing rules — applied to every autocomplete |
 
 **Key difference:** `AGENTS.md` governs multi-step agent tasks.
 `copilot-instructions.md` governs every single line suggestion in the editor.
@@ -50,8 +53,9 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 | File | Applies | Triggered by | What it controls |
 |---|---|---|---|
 | [.githooks/pre-commit](../.githooks/pre-commit) | Local only | `git commit` | Warns if `reviewed by: <author>` placeholder is unfilled in staged files |
-| [pyproject.toml](../pyproject.toml) | Local + CI | `pytest` | Enforces 90% minimum test coverage — fails the test run if not met |
-| [requirements.txt](../requirements.txt) | Local + CI | `pip install` | Pins exact versions of `bcrypt`, `pytest`, `pytest-cov`, `ruff` — prevents version drift |
+| [pyproject.toml](../pyproject.toml) | Local + CI (Python) | `pytest` | Enforces 80% minimum test coverage — fails the test run if not met |
+| `pom.xml` *(Java/Maven)* | Local + CI (Java) | `mvn verify` | JaCoCo plugin enforces 80% line coverage; pins all dependency versions |
+| `build.gradle` / `build.gradle.kts` *(Java/Gradle)* | Local + CI (Java) | `./gradlew test` | JaCoCo coverage verification task; dependency version management |
 
 > **Activation required:** [.githooks/pre-commit](../.githooks/pre-commit) only works after running
 > `git config core.hooksPath .githooks` once per developer machine.
@@ -63,7 +67,7 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 
 | File | Applies | Triggered by | What it controls |
 |---|---|---|---|
-| [.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml) | GitHub Actions | Every PR + push to `main` | Runs 7 automated jobs (see breakdown below) |
+| [.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml) | GitHub Actions | Every PR + push to `main` | Runs 4 automated jobs (see breakdown below) |
 | [.github/pull_request_template.md](../.github/pull_request_template.md) | GitHub PR UI | Opening any PR | Forces AI disclosure checklist + security checklist to appear in every PR description |
 | [.github/CODEOWNERS](../.github/CODEOWNERS) | GitHub merge rules | Every PR | Requires specific team members to approve changes to `AGENTS.md`, workflows, and `CODEOWNERS` itself |
 | **Branch protection ruleset** (GitHub Settings) | GitHub merge button | Every merge attempt | Blocks direct pushes to `main`; requires all CI jobs to pass before merge is allowed |
@@ -73,10 +77,7 @@ enforcement at a later layer (e.g., CI blocks the PR on GitHub).
 | Job name | Blocks merge | What it checks |
 |---|---|---|
 | `Secret Scanning` | Yes | Gitleaks + detect-secrets scan entire diff for credentials, tokens, API keys |
-| `Dependency Vulnerability Scan` | Yes | npm audit / pip safety / govulncheck for known CVEs in dependencies |
-| `Static Security Analysis` | Yes | Semgrep OWASP Top 10 rules — SQL injection, XSS, hardcoded secrets patterns |
-| `Tests & Coverage Gate` | Yes | Runs pytest / jest / go test; fails if coverage drops below 90% |
-| `Linting` | Yes | ruff / eslint / golangci-lint with zero warnings allowed |
+| `Tests & Coverage Gate` | Yes | Runs pytest / mvn / gradle / jest / go test with JaCoCo/pytest-cov; fails if coverage drops below 80% |
 | `PR Policy Compliance` | Yes | Verifies AI disclosure section present, security checklist fully checked, AI tagging present when substantial AI usage is declared |
 | `Protected File Guard` | Yes | Blocks any PR that modifies `AGENTS.md`, `.github/workflows/`, or `CODEOWNERS` without escalation |
 
@@ -135,10 +136,7 @@ Developer opens Pull Request
 GitHub Actions CI runs automatically
         │
         ├── Secret Scanning          ─┐
-        ├── Dependency Scan           │
-        ├── SAST (Semgrep)            ├── All must pass — merge is BLOCKED if any fail
-        ├── Tests & Coverage Gate     │
-        ├── Linting                   │
+        ├── Tests & Coverage Gate     ├── All must pass — merge is BLOCKED if any fail
         ├── PR Policy Compliance      │
         └── Protected File Guard     ─┘
         │
@@ -150,6 +148,47 @@ Human Code Review
         │
         ▼
 Merge to main ✅
+```
+
+---
+
+## File Relationship Diagram
+
+```mermaid
+graph TD
+    subgraph L1["Layer 1 — AI Behavior"]
+        AGENTS["AGENTS.md\n(master policy)"]
+        COPILOT["copilot-instructions.md\n(per-suggestion rules)"]
+    end
+
+    subgraph L2["Layer 2 — Local"]
+        HOOK[".githooks/pre-commit\n(blocks unfilled author tag)"]
+    end
+
+    subgraph L3["Layer 3 — GitHub CI"]
+        CI["ai-guardrails-ci.yml\n(4 jobs)"]
+        PR_TPL["pull_request_template.md\n(disclosure + security checklist)"]
+        CODEOWNERS["CODEOWNERS\n(senior sign-off)"]
+    end
+
+    subgraph L4["Layer 4 — Human Process"]
+        ONBOARD["ai-onboarding.md\n(developer guide)"]
+        TESTING["testing-standards.md\n(test coverage rules)"]
+        REVIEW["code-review-guidelines.md\n(reviewer checklist)"]
+    end
+
+    AGENTS -->|"read by Copilot agent\nconstrains agent tasks"| L2
+    COPILOT -->|"read by Copilot IDE\nshapes every suggestion"| L2
+
+    AGENTS -->|"tagging rules enforced by"| CI
+    PR_TPL -->|"disclosure section checked by"| CI
+    CODEOWNERS -->|"protects"| AGENTS
+    CODEOWNERS -->|"protects"| CI
+
+    ONBOARD -->|"explains rules in"| AGENTS
+    ONBOARD -->|"setup instructions for"| HOOK
+    TESTING -->|"expands testing rules from"| COPILOT
+    REVIEW -->|"guides reviewers applying"| AGENTS
 ```
 
 ---
@@ -175,8 +214,9 @@ These controls rely entirely on human judgment and team culture:
 | [AGENTS.md](../AGENTS.md) | AI Behavior | Repo root |
 | [.github/copilot-instructions.md](../.github/copilot-instructions.md) | AI Behavior | `.github/` |
 | [.githooks/pre-commit](../.githooks/pre-commit) | Local | `.githooks/` — activate with `git config core.hooksPath .githooks` |
-| [pyproject.toml](../pyproject.toml) | Local + CI | Repo root |
-| [requirements.txt](../requirements.txt) | Local + CI | Repo root |
+| [pyproject.toml](../pyproject.toml) | Local + CI (Python) | Repo root |
+| `pom.xml` *(Java/Maven)* | Local + CI (Java) | Repo root |
+| `build.gradle` / `build.gradle.kts` *(Java/Gradle)* | Local + CI (Java) | Repo root |
 | [.github/workflows/ai-guardrails-ci.yml](../.github/workflows/ai-guardrails-ci.yml) | GitHub CI | `.github/workflows/` |
 | [.github/pull_request_template.md](../.github/pull_request_template.md) | GitHub PR | `.github/` |
 | [.github/CODEOWNERS](../.github/CODEOWNERS) | GitHub merge | `.github/` |
@@ -186,4 +226,4 @@ These controls rely entirely on human judgment and team culture:
 
 ---
 
-*Last updated: 2026-03-01 | Maintained by: Platform Engineering*
+*Last updated: 2026-03-04 | Maintained by: Platform Engineering*
